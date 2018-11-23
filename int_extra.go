@@ -16,13 +16,17 @@ package gmp
 */
 import "C"
 
+import (
+	"unsafe"
+)
+
 // Sqrt sets x to the truncated integer part of the square root of x
 //
 // NB This is not part of big.Int
 func (z *Int) Sqrt(x *Int) *Int {
 	x.doinit()
 	z.doinit()
-	C.mpz_sqrt(&z.i[0], &x.i[0])
+	C.mpz_sqrt((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)))
 	return z
 }
 
@@ -32,7 +36,7 @@ func (z *Int) Sqrt(x *Int) *Int {
 func (z *Int) Swap(x *Int) *Int {
 	x.doinit()
 	z.doinit()
-	C.mpz_swap(&z.i[0], &x.i[0])
+	C.mpz_swap((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)))
 	return z
 }
 
@@ -42,7 +46,7 @@ func (z *Int) Swap(x *Int) *Int {
 func (z *Int) AddUint32(x *Int, y uint32) *Int {
 	x.doinit()
 	z.doinit()
-	C.mpz_add_ui(&z.i[0], &x.i[0], C.ulong(y))
+	C.mpz_add_ui((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)), C.ulong(y))
 	return z
 }
 
@@ -52,7 +56,7 @@ func (z *Int) AddUint32(x *Int, y uint32) *Int {
 func (z *Int) SubUint32(x *Int, y uint32) *Int {
 	x.doinit()
 	z.doinit()
-	C.mpz_sub_ui(&z.i[0], &x.i[0], C.ulong(y))
+	C.mpz_sub_ui((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)), C.ulong(y))
 	return z
 }
 
@@ -62,7 +66,7 @@ func (z *Int) SubUint32(x *Int, y uint32) *Int {
 func (z *Int) Uint32Sub(x uint32, y *Int) *Int {
 	y.doinit()
 	z.doinit()
-	C.mpz_ui_sub(&z.i[0], C.ulong(x), &y.i[0])
+	C.mpz_ui_sub((C.mpz_ptr)(unsafe.Pointer(&z.i)), C.ulong(x), (C.mpz_ptr)(unsafe.Pointer(&y.i)))
 	return z
 }
 
@@ -72,7 +76,7 @@ func (z *Int) Uint32Sub(x uint32, y *Int) *Int {
 func (z *Int) MulUint32(x *Int, y uint32) *Int {
 	x.doinit()
 	z.doinit()
-	C.mpz_mul_ui(&z.i[0], &x.i[0], C.ulong(y))
+	C.mpz_mul_ui((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)), C.ulong(y))
 	return z
 }
 
@@ -82,7 +86,7 @@ func (z *Int) MulUint32(x *Int, y uint32) *Int {
 func (z *Int) MulInt32(x *Int, y int32) *Int {
 	x.doinit()
 	z.doinit()
-	C.mpz_mul_si(&z.i[0], &x.i[0], C.long(y))
+	C.mpz_mul_si((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)), C.long(y))
 	return z
 }
 
@@ -93,7 +97,7 @@ func (z *Int) AddMul(x, y *Int) *Int {
 	x.doinit()
 	y.doinit()
 	z.doinit()
-	C.mpz_addmul(&z.i[0], &x.i[0], &y.i[0])
+	C.mpz_addmul((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)), (C.mpz_ptr)(unsafe.Pointer(&y.i)))
 	return z
 }
 
@@ -103,7 +107,7 @@ func (z *Int) AddMul(x, y *Int) *Int {
 func (z *Int) AddMulUint32(x *Int, y uint32) *Int {
 	x.doinit()
 	z.doinit()
-	C.mpz_addmul_ui(&z.i[0], &x.i[0], C.ulong(y))
+	C.mpz_addmul_ui((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)), C.ulong(y))
 	return z
 }
 
@@ -114,7 +118,7 @@ func (z *Int) SubMul(x, y *Int) *Int {
 	x.doinit()
 	y.doinit()
 	z.doinit()
-	C.mpz_submul(&z.i[0], &x.i[0], &y.i[0])
+	C.mpz_submul((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)), (C.mpz_ptr)(unsafe.Pointer(&y.i)))
 	return z
 }
 
@@ -124,7 +128,7 @@ func (z *Int) SubMul(x, y *Int) *Int {
 func (z *Int) SubMulUint32(x *Int, y uint32) *Int {
 	x.doinit()
 	z.doinit()
-	C.mpz_submul_ui(&z.i[0], &x.i[0], C.ulong(y))
+	C.mpz_submul_ui((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)), C.ulong(y))
 	return z
 }
 
@@ -148,7 +152,7 @@ func compared(i C.int) int {
 // NB This is not part of big.Int
 func (z *Int) CmpUint32(x uint32) int {
 	z.doinit()
-	return compared(C._mpz_cmp_ui(&z.i[0], C.ulong(x)))
+	return compared(C._mpz_cmp_ui((C.mpz_ptr)(unsafe.Pointer(&z.i)), C.ulong(x)))
 }
 
 // CmpInt32 compares z and x and returns:
@@ -160,7 +164,7 @@ func (z *Int) CmpUint32(x uint32) int {
 // NB This is not part of big.Int
 func (z *Int) CmpInt32(x int32) int {
 	z.doinit()
-	return compared(C._mpz_cmp_si(&z.i[0], C.long(x)))
+	return compared(C._mpz_cmp_si((C.mpz_ptr)(unsafe.Pointer(&z.i)), C.long(x)))
 }
 
 // CmpAbs compares |z| and |x| and returns:
@@ -173,7 +177,7 @@ func (z *Int) CmpInt32(x int32) int {
 func (z *Int) CmpAbs(x *Int) int {
 	x.doinit()
 	z.doinit()
-	return compared(C.mpz_cmpabs(&z.i[0], &x.i[0]))
+	return compared(C.mpz_cmpabs((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i))))
 }
 
 // CmpAbsUint32 compares |z| and |x| and returns:
@@ -185,7 +189,7 @@ func (z *Int) CmpAbs(x *Int) int {
 // NB This is not part of big.Int
 func (z *Int) CmpAbsUint32(x uint32) int {
 	z.doinit()
-	return compared(C.mpz_cmpabs_ui(&z.i[0], C.ulong(x)))
+	return compared(C.mpz_cmpabs_ui((C.mpz_ptr)(unsafe.Pointer(&z.i)), C.ulong(x)))
 }
 
 // Uint32 returns the uint32 representation of z, if z fits into a uint32.
@@ -195,7 +199,7 @@ func (z *Int) CmpAbsUint32(x uint32) int {
 // NB This is not part of big.Int
 func (z *Int) Uint32() uint32 {
 	z.doinit()
-	return uint32(C.mpz_get_ui(&z.i[0]))
+	return uint32(C.mpz_get_ui((C.mpz_ptr)(unsafe.Pointer(&z.i))))
 }
 
 // Int32 returns the int32 representation of z, if z fits into a signed int32.
@@ -204,5 +208,5 @@ func (z *Int) Uint32() uint32 {
 // NB This is not part of big.Int
 func (z *Int) Int32() int32 {
 	z.doinit()
-	return int32(C.mpz_get_si(&z.i[0]))
+	return int32(C.mpz_get_si((C.mpz_ptr)(unsafe.Pointer(&z.i))))
 }

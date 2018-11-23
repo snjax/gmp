@@ -152,7 +152,6 @@ var floatStringTests = []struct {
 func TestFloatString(t *testing.T) {
 	for i, test := range floatStringTests {
 		x, _ := new(Rat).SetString(test.in)
-
 		if x.FloatString(test.prec) != test.out {
 			t.Errorf("#%d got %s want %s", i, x.FloatString(test.prec), test.out)
 		}

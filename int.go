@@ -43,6 +43,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"math/rand"
 	"runtime"
 	"strings"
@@ -57,6 +58,9 @@ var (
 	_Int10 = NewInt(10)
 )
 
+var wordSize C.size_t
+var bitsPerWord C.size_t
+
 // An Int represents a signed multi-precision integer.
 // The zero value for an Int represents the value 0.
 type Int struct {
@@ -64,11 +68,18 @@ type Int struct {
 	init bool
 }
 
+func nextPrime(z *Int) *Int {
+	res := new(Int)
+	res.doinit()
+	C.mpz_nextprime((C.mpz_ptr)(unsafe.Pointer(&res.i)), (C.mpz_ptr)(unsafe.Pointer(&z.i)))
+	return res
+}
+
 // Finalizer - release the memory allocated to the mpz
 func intFinalize(z *Int) {
 	if z.init {
 		runtime.SetFinalizer(z, nil)
-		C.mpz_clear(&z.i[0])
+		C.mpz_clear((C.mpz_ptr)(unsafe.Pointer(&z.i)))
 		z.init = false
 	}
 }
@@ -82,7 +93,7 @@ func (z *Int) doinit() {
 		return
 	}
 	z.init = true
-	C.mpz_init(&z.i[0])
+	C.mpz_init((C.mpz_ptr)(unsafe.Pointer(&z.i)))
 	runtime.SetFinalizer(z, intFinalize)
 }
 
@@ -104,7 +115,7 @@ func (z *Int) Clear() {
 //
 func (z *Int) Sign() int {
 	z.doinit()
-	return int(C._mpz_sgn(&z.i[0]))
+	return int(C._mpz_sgn((C.mpz_ptr)(unsafe.Pointer(&z.i))))
 }
 
 // SetInt64 sets z to x and returns z.
@@ -113,16 +124,16 @@ func (z *Int) SetInt64(x int64) *Int {
 	// Test for truncation
 	y := C.long(x)
 	if int64(y) == x {
-		C.mpz_set_si(&z.i[0], y)
+		C.mpz_set_si((C.mpz_ptr)(unsafe.Pointer(&z.i)), y)
 	} else {
 		negative := false
 		if x < 0 {
 			x = -x
 			negative = true
 		}
-		C.mpz_import(&z.i[0], 1, 0, 8, 0, 0, unsafe.Pointer(&x))
+		C.mpz_import((C.mpz_ptr)(unsafe.Pointer(&z.i)), 1, 0, 8, 0, 0, unsafe.Pointer(&x))
 		if negative {
-			C.mpz_neg(&z.i[0], &z.i[0])
+			C.mpz_neg((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&z.i)))
 		}
 	}
 	return z
@@ -134,9 +145,9 @@ func (z *Int) SetUint64(x uint64) *Int {
 	// Test for truncation
 	y := C.ulong(x)
 	if uint64(y) == x {
-		C.mpz_set_ui(&z.i[0], y)
+		C.mpz_set_ui((C.mpz_ptr)(unsafe.Pointer(&z.i)), y)
 	} else {
-		C.mpz_import(&z.i[0], 1, 0, 8, 0, 0, unsafe.Pointer(&x))
+		C.mpz_import((C.mpz_ptr)(unsafe.Pointer(&z.i)), 1, 0, 8, 0, 0, unsafe.Pointer(&x))
 	}
 	return z
 }
@@ -146,10 +157,14 @@ func NewInt(x int64) *Int {
 	return new(Int).SetInt64(x)
 }
 
+func NewUint(x uint64) *Int {
+	return new(Int).SetUint64(x)
+}
+
 // Set sets z to x and returns z.
 func (z *Int) Set(x *Int) *Int {
 	z.doinit()
-	C.mpz_set(&z.i[0], &x.i[0])
+	C.mpz_set((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)))
 	return z
 }
 
@@ -177,7 +192,7 @@ func (z *Int) Set(x *Int) *Int {
 func (z *Int) Abs(x *Int) *Int {
 	x.doinit()
 	z.doinit()
-	C.mpz_abs(&z.i[0], &x.i[0])
+	C.mpz_abs((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)))
 	return z
 }
 
@@ -185,7 +200,7 @@ func (z *Int) Abs(x *Int) *Int {
 func (z *Int) Neg(x *Int) *Int {
 	x.doinit()
 	z.doinit()
-	C.mpz_neg(&z.i[0], &x.i[0])
+	C.mpz_neg((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)))
 	return z
 }
 
@@ -194,7 +209,7 @@ func (z *Int) Add(x, y *Int) *Int {
 	x.doinit()
 	y.doinit()
 	z.doinit()
-	C.mpz_add(&z.i[0], &x.i[0], &y.i[0])
+	C.mpz_add((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)), (C.mpz_ptr)(unsafe.Pointer(&y.i)))
 	return z
 }
 
@@ -203,7 +218,7 @@ func (z *Int) Sub(x, y *Int) *Int {
 	x.doinit()
 	y.doinit()
 	z.doinit()
-	C.mpz_sub(&z.i[0], &x.i[0], &y.i[0])
+	C.mpz_sub((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)), (C.mpz_ptr)(unsafe.Pointer(&y.i)))
 	return z
 }
 
@@ -212,7 +227,7 @@ func (z *Int) Mul(x, y *Int) *Int {
 	x.doinit()
 	y.doinit()
 	z.doinit()
-	C.mpz_mul(&z.i[0], &x.i[0], &y.i[0])
+	C.mpz_mul((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)), (C.mpz_ptr)(unsafe.Pointer(&y.i)))
 	return z
 }
 
@@ -230,12 +245,12 @@ func (z *Int) MulRange(a, b int64) *Int {
 
 	// Can use gmp factorial routine if a = 1 and b >= 1
 	if a == 1 && b >= 1 {
-		C.mpz_fac_ui(&z.i[0], C.ulong(b))
+		C.mpz_fac_ui((C.mpz_ptr)(unsafe.Pointer(&z.i)), C.ulong(b))
 	} else {
 		// Slow
 		z.SetInt64(a)
 		for i := a + 1; i <= b; i++ {
-			C.mpz_mul_si(&z.i[0], &z.i[0], C.long(i))
+			C.mpz_mul_si((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&z.i)), C.long(i))
 		}
 	}
 	return z
@@ -256,7 +271,7 @@ func (z *Int) Quo(x, y *Int) *Int {
 	x.doinit()
 	y.doinit()
 	z.doinit()
-	C.mpz_tdiv_q(&z.i[0], &x.i[0], &y.i[0])
+	C.mpz_tdiv_q((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)), (C.mpz_ptr)(unsafe.Pointer(&y.i)))
 	return z
 }
 
@@ -267,7 +282,7 @@ func (z *Int) Rem(x, y *Int) *Int {
 	x.doinit()
 	y.doinit()
 	z.doinit()
-	C.mpz_tdiv_r(&z.i[0], &x.i[0], &y.i[0])
+	C.mpz_tdiv_r((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)), (C.mpz_ptr)(unsafe.Pointer(&y.i)))
 	return z
 }
 
@@ -288,7 +303,7 @@ func (z *Int) QuoRem(x, y, r *Int) (*Int, *Int) {
 	y.doinit()
 	r.doinit()
 	z.doinit()
-	C.mpz_tdiv_qr(&z.i[0], &r.i[0], &x.i[0], &y.i[0])
+	C.mpz_tdiv_qr((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&r.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)), (C.mpz_ptr)(unsafe.Pointer(&y.i)))
 	return z, r
 }
 
@@ -301,9 +316,9 @@ func (z *Int) Div(x, y *Int) *Int {
 	z.doinit()
 	switch y.Sign() {
 	case 1:
-		C.mpz_fdiv_q(&z.i[0], &x.i[0], &y.i[0])
+		C.mpz_fdiv_q((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)), (C.mpz_ptr)(unsafe.Pointer(&y.i)))
 	case -1:
-		C.mpz_cdiv_q(&z.i[0], &x.i[0], &y.i[0])
+		C.mpz_cdiv_q((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)), (C.mpz_ptr)(unsafe.Pointer(&y.i)))
 	case 0:
 		panic("Division by zero")
 	}
@@ -319,9 +334,9 @@ func (z *Int) Mod(x, y *Int) *Int {
 	z.doinit()
 	switch y.Sign() {
 	case 1:
-		C.mpz_fdiv_r(&z.i[0], &x.i[0], &y.i[0])
+		C.mpz_fdiv_r((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)), (C.mpz_ptr)(unsafe.Pointer(&y.i)))
 	case -1:
-		C.mpz_cdiv_r(&z.i[0], &x.i[0], &y.i[0])
+		C.mpz_cdiv_r((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)), (C.mpz_ptr)(unsafe.Pointer(&y.i)))
 	case 0:
 		panic("Division by zero")
 	}
@@ -350,9 +365,9 @@ func (z *Int) DivMod(x, y, m *Int) (*Int, *Int) {
 	z.doinit()
 	switch y.Sign() {
 	case 1:
-		C.mpz_fdiv_qr(&z.i[0], &m.i[0], &x.i[0], &y.i[0])
+		C.mpz_fdiv_qr((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&m.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)), (C.mpz_ptr)(unsafe.Pointer(&y.i)))
 	case -1:
-		C.mpz_cdiv_qr(&z.i[0], &m.i[0], &x.i[0], &y.i[0])
+		C.mpz_cdiv_qr((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&m.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)), (C.mpz_ptr)(unsafe.Pointer(&y.i)))
 	case 0:
 		panic("Division by zero")
 	}
@@ -368,7 +383,7 @@ func (z *Int) DivMod(x, y, m *Int) (*Int, *Int) {
 func (z *Int) Cmp(y *Int) (r int) {
 	z.doinit()
 	y.doinit()
-	r = int(C.mpz_cmp(&z.i[0], &y.i[0]))
+	r = int(C.mpz_cmp((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&y.i))))
 	if r < 0 {
 		r = -1
 	} else if r > 0 {
@@ -383,7 +398,7 @@ func (z *Int) string(base int) string {
 		return "<nil>"
 	}
 	z.doinit()
-	p := C.mpz_get_str(nil, C.int(base), &z.i[0])
+	p := C.mpz_get_str(nil, C.int(base), (C.mpz_ptr)(unsafe.Pointer(&z.i)))
 	s := C.GoString(p)
 	C.free(unsafe.Pointer(p))
 	return s
@@ -595,7 +610,7 @@ func (z *Int) Scan(s fmt.ScanState, ch rune) error {
 	z.doinit()
 	// null terminate for C
 	in = append(in, 0)
-	if C.mpz_set_str(&z.i[0], (*C.char)(unsafe.Pointer(&in[0])), C.int(base)) < 0 {
+	if C.mpz_set_str((C.mpz_ptr)(unsafe.Pointer(&z.i)), (*C.char)(unsafe.Pointer(&in[0])), C.int(base)) < 0 {
 		return errors.New("Int.Scan: failed")
 	}
 	return nil
@@ -607,14 +622,14 @@ func (z *Int) Int64() (y int64) {
 	if !z.init {
 		return
 	}
-	if C.mpz_fits_slong_p(&z.i[0]) != 0 {
-		return int64(C.mpz_get_si(&z.i[0]))
+	if C.mpz_fits_slong_p((C.mpz_ptr)(unsafe.Pointer(&z.i))) != 0 {
+		return int64(C.mpz_get_si((C.mpz_ptr)(unsafe.Pointer(&z.i))))
 	}
 	// Undefined result if > 64 bits
 	if z.BitLen() > 64 {
 		return
 	}
-	C.mpz_export(unsafe.Pointer(&y), nil, -1, 8, 0, 0, &z.i[0])
+	C.mpz_export(unsafe.Pointer(&y), nil, -1, 8, 0, 0, (C.mpz_ptr)(unsafe.Pointer(&z.i)))
 	if z.Sign() < 0 {
 		y = -y
 	}
@@ -627,14 +642,14 @@ func (z *Int) Uint64() (y uint64) {
 	if !z.init {
 		return
 	}
-	if C.mpz_fits_ulong_p(&z.i[0]) != 0 {
-		return uint64(C.mpz_get_ui(&z.i[0]))
+	if C.mpz_fits_ulong_p((C.mpz_ptr)(unsafe.Pointer(&z.i))) != 0 {
+		return uint64(C.mpz_get_ui((C.mpz_ptr)(unsafe.Pointer(&z.i))))
 	}
 	// Undefined result if > 64 bits
 	if z.BitLen() > 64 {
 		return
 	}
-	C.mpz_export(unsafe.Pointer(&y), nil, -1, 8, 0, 0, &z.i[0])
+	C.mpz_export(unsafe.Pointer(&y), nil, -1, 8, 0, 0, (C.mpz_ptr)(unsafe.Pointer(&z.i)))
 	return
 }
 
@@ -662,7 +677,7 @@ func (z *Int) SetString(s string, base int) (*Int, bool) {
 	}
 	p := C.CString(s)
 	defer C.free(unsafe.Pointer(p))
-	if C.mpz_set_str(&z.i[0], p, C.int(base)) < 0 {
+	if C.mpz_set_str((C.mpz_ptr)(unsafe.Pointer(&z.i)), p, C.int(base)) < 0 {
 		return nil, false
 	}
 	return z, true // err == io.EOF => scan consumed all of s
@@ -675,7 +690,7 @@ func (z *Int) SetBytes(buf []byte) *Int {
 	if len(buf) == 0 {
 		z.SetInt64(0)
 	} else {
-		C.mpz_import(&z.i[0], C.size_t(len(buf)), 1, 1, 1, 0, unsafe.Pointer(&buf[0]))
+		C.mpz_import((C.mpz_ptr)(unsafe.Pointer(&z.i)), C.size_t(len(buf)), 1, 1, 1, 0, unsafe.Pointer(&buf[0]))
 	}
 	return z
 }
@@ -684,7 +699,7 @@ func (z *Int) SetBytes(buf []byte) *Int {
 func (z *Int) Bytes() []byte {
 	b := make([]byte, 1+(z.BitLen()+7)/8)
 	n := C.size_t(len(b))
-	C.mpz_export(unsafe.Pointer(&b[0]), &n, 1, 1, 1, 0, &z.i[0])
+	C.mpz_export(unsafe.Pointer(&b[0]), &n, 1, 1, 1, 0, (C.mpz_ptr)(unsafe.Pointer(&z.i)))
 	return b[0:n]
 }
 
@@ -695,7 +710,7 @@ func (z *Int) BitLen() int {
 	if z.Sign() == 0 {
 		return 0
 	}
-	return int(C.mpz_sizeinbase(&z.i[0], 2))
+	return int(C.mpz_sizeinbase((C.mpz_ptr)(unsafe.Pointer(&z.i)), 2))
 }
 
 // Exp sets z = x**y mod |m| (i.e. the sign of m is ignored), and returns z.
@@ -710,10 +725,10 @@ func (z *Int) Exp(x, y, m *Int) *Int {
 		return z
 	}
 	if m == nil || m.Sign() == 0 {
-		C.mpz_pow_ui(&z.i[0], &x.i[0], C.mpz_get_ui(&y.i[0]))
+		C.mpz_pow_ui((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)), C.mpz_get_ui((C.mpz_ptr)(unsafe.Pointer(&y.i))))
 	} else {
 		m.doinit()
-		C.mpz_powm(&z.i[0], &x.i[0], &y.i[0], &m.i[0])
+		C.mpz_powm((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)), (C.mpz_ptr)(unsafe.Pointer(&y.i)), (C.mpz_ptr)(unsafe.Pointer(&m.i)))
 	}
 	return z
 }
@@ -735,7 +750,7 @@ func (z *Int) GCD(x, y, a, b *Int) *Int {
 			y.SetInt64(0)
 		}
 	} else if x == nil && y == nil {
-		C.mpz_gcd(&z.i[0], &a.i[0], &b.i[0])
+		C.mpz_gcd((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&a.i)), (C.mpz_ptr)(unsafe.Pointer(&b.i)))
 	} else {
 		if x != nil {
 			x.doinit()
@@ -747,7 +762,7 @@ func (z *Int) GCD(x, y, a, b *Int) *Int {
 		} else {
 			y = _Int0
 		}
-		C.mpz_gcdext(&z.i[0], &x.i[0], &y.i[0], &a.i[0], &b.i[0])
+		C.mpz_gcdext((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)), (C.mpz_ptr)(unsafe.Pointer(&y.i)), (C.mpz_ptr)(unsafe.Pointer(&a.i)), (C.mpz_ptr)(unsafe.Pointer(&b.i)))
 	}
 	return z
 }
@@ -757,7 +772,7 @@ func (z *Int) GCD(x, y, a, b *Int) *Int {
 // If it returns false, z is not prime.
 func (z *Int) ProbablyPrime(n int) bool {
 	z.doinit()
-	return int(C.mpz_probab_prime_p(&z.i[0], C.int(n))) > 0
+	return int(C.mpz_probab_prime_p((C.mpz_ptr)(unsafe.Pointer(&z.i)), C.int(n))) > 0
 }
 
 // Rand sets z to a pseudo-random number in [0, n) and returns z.
@@ -791,7 +806,7 @@ func (z *Int) Rand(rnd *rand.Rand, n *Int) *Int {
 		}
 		// Mask out the top bits so this is only just bigger than n
 		words[0] &= mask
-		C.mpz_import(&z.i[0], C.size_t(len(words)), 1, 4, 0, 0, unsafe.Pointer(&words[0]))
+		C.mpz_import((C.mpz_ptr)(unsafe.Pointer(&z.i)), C.size_t(len(words)), 1, 4, 0, 0, unsafe.Pointer(&words[0]))
 		// Exit if z < n - should take ~1.5 iterations of loop on average
 		if z.Cmp(t) < 0 {
 			break
@@ -809,7 +824,7 @@ func (z *Int) ModInverse(g, p *Int) *Int {
 	g.doinit()
 	p.doinit()
 	z.doinit()
-	C.mpz_invert(&z.i[0], &g.i[0], &p.i[0])
+	C.mpz_invert((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&g.i)), (C.mpz_ptr)(unsafe.Pointer(&p.i)))
 	return z
 }
 
@@ -817,7 +832,7 @@ func (z *Int) ModInverse(g, p *Int) *Int {
 func (z *Int) Lsh(x *Int, n uint) *Int {
 	x.doinit()
 	z.doinit()
-	C._mpz_mul_2exp(&z.i[0], &x.i[0], C.ulong(n))
+	C._mpz_mul_2exp((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)), C.ulong(n))
 	return z
 }
 
@@ -825,7 +840,7 @@ func (z *Int) Lsh(x *Int, n uint) *Int {
 func (z *Int) Rsh(x *Int, n uint) *Int {
 	x.doinit()
 	z.doinit()
-	C._mpz_div_2exp(&z.i[0], &x.i[0], C.ulong(n))
+	C._mpz_div_2exp((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)), C.ulong(n))
 	return z
 }
 
@@ -833,7 +848,7 @@ func (z *Int) Rsh(x *Int, n uint) *Int {
 // returns (z>>i)&1. The bit index i must be >= 0.
 func (z *Int) Bit(i int) uint {
 	z.doinit()
-	return uint(C._mpz_tstbit(&z.i[0], C.ulong(i)))
+	return uint(C._mpz_tstbit((C.mpz_ptr)(unsafe.Pointer(&z.i)), C.ulong(i)))
 }
 
 // SetBit sets z to x, with x's i'th bit set to b (0 or 1).
@@ -845,9 +860,9 @@ func (z *Int) SetBit(x *Int, i int, b uint) *Int {
 		z.Set(x)
 	}
 	if b == 0 {
-		C._mpz_clrbit(&z.i[0], C.ulong(i))
+		C._mpz_clrbit((C.mpz_ptr)(unsafe.Pointer(&z.i)), C.ulong(i))
 	} else {
-		C._mpz_setbit(&z.i[0], C.ulong(i))
+		C._mpz_setbit((C.mpz_ptr)(unsafe.Pointer(&z.i)), C.ulong(i))
 	}
 	return z
 }
@@ -857,7 +872,7 @@ func (z *Int) And(x, y *Int) *Int {
 	x.doinit()
 	y.doinit()
 	z.doinit()
-	C.mpz_and(&z.i[0], &x.i[0], &y.i[0])
+	C.mpz_and((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)), (C.mpz_ptr)(unsafe.Pointer(&y.i)))
 	return z
 }
 
@@ -872,8 +887,8 @@ func (z *Int) AndNot(x, y *Int) *Int {
 		aliased = true
 		t = new(Int).Set(y)
 	}
-	C.mpz_com(&t.i[0], &y.i[0])
-	C.mpz_and(&z.i[0], &x.i[0], &t.i[0])
+	C.mpz_com((C.mpz_ptr)(unsafe.Pointer(&t.i)), (C.mpz_ptr)(unsafe.Pointer(&y.i)))
+	C.mpz_and((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)), (C.mpz_ptr)(unsafe.Pointer(&t.i)))
 	if aliased {
 		t.Clear()
 	}
@@ -885,7 +900,7 @@ func (z *Int) Or(x, y *Int) *Int {
 	x.doinit()
 	y.doinit()
 	z.doinit()
-	C.mpz_ior(&z.i[0], &x.i[0], &y.i[0])
+	C.mpz_ior((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)), (C.mpz_ptr)(unsafe.Pointer(&y.i)))
 	return z
 }
 
@@ -894,7 +909,7 @@ func (z *Int) Xor(x, y *Int) *Int {
 	x.doinit()
 	y.doinit()
 	z.doinit()
-	C.mpz_xor(&z.i[0], &x.i[0], &y.i[0])
+	C.mpz_xor((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)), (C.mpz_ptr)(unsafe.Pointer(&y.i)))
 	return z
 }
 
@@ -902,7 +917,7 @@ func (z *Int) Xor(x, y *Int) *Int {
 func (z *Int) Not(x *Int) *Int {
 	x.doinit()
 	z.doinit()
-	C.mpz_com(&z.i[0], &x.i[0])
+	C.mpz_com((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)))
 	return z
 }
 
@@ -913,7 +928,7 @@ const intGobVersion byte = 1
 func (z *Int) GobEncode() ([]byte, error) {
 	buf := make([]byte, 2+(z.BitLen()+7)/8)
 	n := C.size_t(len(buf) - 1)
-	C.mpz_export(unsafe.Pointer(&buf[1]), &n, 1, 1, 1, 0, &z.i[0])
+	C.mpz_export(unsafe.Pointer(&buf[1]), &n, 1, 1, 1, 0, (C.mpz_ptr)(unsafe.Pointer(&z.i)))
 	b := intGobVersion << 1 // make space for sign bit
 	if z.Sign() < 0 {
 		b |= 1
@@ -933,7 +948,7 @@ func (z *Int) GobDecode(buf []byte) error {
 	}
 	z.SetBytes(buf[1:])
 	if b&1 != 0 {
-		C.mpz_neg(&z.i[0], &z.i[0])
+		C.mpz_neg((C.mpz_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&z.i)))
 	}
 	return nil
 }
@@ -952,4 +967,33 @@ func (z *Int) UnmarshalJSON(x []byte) error {
 		return fmt.Errorf("math/big: cannot unmarshal %s into a *gmp.Int", x)
 	}
 	return nil
+}
+
+func (out *Int) SetBigInt(num *big.Int) *Int {
+	out.doinit()
+	words := num.Bits()
+	if len(words) > 0 {
+		C.mpz_import((C.mpz_ptr)(unsafe.Pointer(&out.i)), C.size_t(len(words)), -1, wordSize, 0, 0, unsafe.Pointer(&words[0]))
+	}
+	return out
+}
+
+func (num *Int) BigInt() (out *big.Int) {
+	out = &big.Int{}
+	if !num.init {
+		return
+	}
+	wordsNeeded := (C.mpz_sizeinbase((C.mpz_ptr)(unsafe.Pointer(&num.i)), 2) + (bitsPerWord - 1)) / bitsPerWord
+	words := make([]big.Word, wordsNeeded)
+	var wordsWritten C.size_t
+	C.mpz_export(unsafe.Pointer(&words[0]), &wordsWritten, -1, wordSize, 0, 0, (C.mpz_ptr)(unsafe.Pointer(&num.i)))
+	out.SetBits(words)
+	return
+}
+
+func init() {
+	var oneWord big.Word
+	size := unsafe.Sizeof(oneWord)
+	wordSize = C.size_t(size)
+	bitsPerWord = C.size_t(8 * size)
 }

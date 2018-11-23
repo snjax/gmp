@@ -52,7 +52,7 @@ type Rat struct {
 func ratFinalize(z *Rat) {
 	if z.init {
 		runtime.SetFinalizer(z, nil)
-		C.mpq_clear(&z.i[0])
+		C.mpq_clear((C.mpq_ptr)(unsafe.Pointer(&z.i)))
 		z.init = false
 	}
 }
@@ -66,7 +66,7 @@ func (z *Rat) doinit() {
 		return
 	}
 	z.init = true
-	C.mpq_init(&z.i[0])
+	C.mpq_init((C.mpq_ptr)(unsafe.Pointer(&z.i)))
 	runtime.SetFinalizer(z, ratFinalize)
 }
 
@@ -92,7 +92,7 @@ func (z *Rat) SetFloat64(f float64) *Rat {
 		return nil
 	}
 	z.doinit()
-	C.mpq_set_d(&z.i[0], C.double(f))
+	C.mpq_set_d((C.mpq_ptr)(unsafe.Pointer(&z.i)), C.double(f))
 	return z
 }
 
@@ -104,7 +104,7 @@ func (z *Rat) SetFloat64(f float64) *Rat {
 // NB This uses GMP which is fast but rounds differently to Float64
 func (z *Rat) Float64Gmp() (f float64, exact bool) {
 	z.doinit()
-	f = float64(C.mpq_get_d(&z.i[0]))
+	f = float64(C.mpq_get_d((C.mpq_ptr)(unsafe.Pointer(&z.i))))
 	if !(math.IsNaN(f) || math.IsInf(f, 0)) {
 		exact = new(Rat).SetFloat64(f).Cmp(z) == 0
 	}
@@ -225,8 +225,8 @@ func (z *Rat) Float64() (f float64, exact bool) {
 func (z *Rat) SetNum(a *Int) *Rat {
 	z.doinit()
 	a.doinit()
-	C.mpq_set_num(&z.i[0], &a.i[0])
-	C.mpq_canonicalize(&z.i[0])
+	C.mpq_set_num((C.mpq_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&a.i)))
+	C.mpq_canonicalize((C.mpq_ptr)(unsafe.Pointer(&z.i)))
 	return z
 }
 
@@ -238,10 +238,10 @@ func (z *Rat) SetNum(a *Int) *Rat {
 func (z *Rat) SetDenom(a *Int) *Rat {
 	z.doinit()
 	a.doinit()
-	C.mpq_set_den(&z.i[0], &a.i[0])
+	C.mpq_set_den((C.mpq_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&a.i)))
 	// If numerator is zero don't canonicalize
-	if C._mpq_num_sgn(&z.i[0]) != 0 {
-		C.mpq_canonicalize(&z.i[0])
+	if C._mpq_num_sgn((C.mpq_ptr)(unsafe.Pointer(&z.i))) != 0 {
+		C.mpq_canonicalize((C.mpq_ptr)(unsafe.Pointer(&z.i)))
 	}
 	return z
 }
@@ -252,9 +252,9 @@ func (z *Rat) SetFrac(a, b *Int) *Rat {
 	a.doinit()
 	b.doinit()
 	// FIXME copying? or referencing?
-	C.mpq_set_num(&z.i[0], &a.i[0])
-	C.mpq_set_den(&z.i[0], &b.i[0])
-	C.mpq_canonicalize(&z.i[0])
+	C.mpq_set_num((C.mpq_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&a.i)))
+	C.mpq_set_den((C.mpq_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&b.i)))
+	C.mpq_canonicalize((C.mpq_ptr)(unsafe.Pointer(&z.i)))
 	return z
 }
 
@@ -270,8 +270,8 @@ func (z *Rat) SetFrac64(a, b int64) *Rat {
 			a = -a
 			b = -b
 		}
-		C.mpq_set_si(&z.i[0], C.long(a), C.ulong(b))
-		C.mpq_canonicalize(&z.i[0])
+		C.mpq_set_si((C.mpq_ptr)(unsafe.Pointer(&z.i)), C.long(a), C.ulong(b))
+		C.mpq_canonicalize((C.mpq_ptr)(unsafe.Pointer(&z.i)))
 		if b < 0 {
 			// This only happens when b = 1<<63
 			z.Neg(z)
@@ -287,7 +287,7 @@ func (z *Rat) SetFrac64(a, b int64) *Rat {
 func (z *Rat) SetInt(x *Int) *Rat {
 	z.doinit()
 	// FIXME copying? or referencing?
-	C.mpq_set_z(&z.i[0], &x.i[0])
+	C.mpq_set_z((C.mpq_ptr)(unsafe.Pointer(&z.i)), (C.mpz_ptr)(unsafe.Pointer(&x.i)))
 	return z
 }
 
@@ -301,7 +301,7 @@ func (z *Rat) SetInt64(x int64) *Rat {
 func (z *Rat) Set(x *Rat) *Rat {
 	if z != x {
 		z.doinit()
-		C.mpq_set(&z.i[0], &x.i[0])
+		C.mpq_set((C.mpq_ptr)(unsafe.Pointer(&z.i)), (C.mpq_ptr)(unsafe.Pointer(&x.i)))
 	}
 	return z
 }
@@ -309,14 +309,14 @@ func (z *Rat) Set(x *Rat) *Rat {
 // Abs sets z to |x| (the absolute value of x) and returns z.
 func (z *Rat) Abs(x *Rat) *Rat {
 	z.doinit()
-	C.mpq_abs(&z.i[0], &x.i[0])
+	C.mpq_abs((C.mpq_ptr)(unsafe.Pointer(&z.i)), (C.mpq_ptr)(unsafe.Pointer(&x.i)))
 	return z
 }
 
 // Neg sets z to -x and returns z.
 func (z *Rat) Neg(x *Rat) *Rat {
 	z.doinit()
-	C.mpq_neg(&z.i[0], &x.i[0])
+	C.mpq_neg((C.mpq_ptr)(unsafe.Pointer(&z.i)), (C.mpq_ptr)(unsafe.Pointer(&x.i)))
 	return z
 }
 
@@ -327,7 +327,7 @@ func (z *Rat) Inv(x *Rat) *Rat {
 	if x.Sign() == 0 {
 		panic("division by zero")
 	}
-	C.mpq_inv(&z.i[0], &x.i[0])
+	C.mpq_inv((C.mpq_ptr)(unsafe.Pointer(&z.i)), (C.mpq_ptr)(unsafe.Pointer(&x.i)))
 	return z
 }
 
@@ -339,13 +339,13 @@ func (z *Rat) Inv(x *Rat) *Rat {
 //
 func (z *Rat) Sign() int {
 	z.doinit()
-	return int(C.__mpq_sgn(&z.i[0]))
+	return int(C.__mpq_sgn((C.mpq_ptr)(unsafe.Pointer(&z.i))))
 }
 
 // IsInt returns true if the denominator of z is 1.
 func (z *Rat) IsInt() bool {
 	z.doinit()
-	return C.__mpz_cmp_ui(C._mpq_denref(&z.i[0]), C.ulong(1)) == 0
+	return C.__mpz_cmp_ui(C._mpq_denref((C.mpq_ptr)(unsafe.Pointer(&z.i))), C.ulong(1)) == 0
 }
 
 // Num returns the numerator of z; it may be <= 0.  The result is a
@@ -359,7 +359,7 @@ func (z *Rat) Num() *Int {
 	z.doinit()
 	res := new(Int)
 	res.doinit()
-	C.mpq_get_num(&res.i[0], &z.i[0])
+	C.mpq_get_num((C.mpz_ptr)(unsafe.Pointer(&res.i)), (C.mpq_ptr)(unsafe.Pointer(&z.i)))
 	return res
 }
 
@@ -373,7 +373,7 @@ func (z *Rat) Denom() *Int {
 	z.doinit()
 	res := new(Int)
 	res.doinit()
-	C.mpq_get_den(&res.i[0], &z.i[0])
+	C.mpq_get_den((C.mpz_ptr)(unsafe.Pointer(&res.i)), (C.mpq_ptr)(unsafe.Pointer(&z.i)))
 	return res
 }
 
@@ -386,7 +386,7 @@ func (z *Rat) Denom() *Int {
 func (z *Rat) Cmp(y *Rat) (r int) {
 	z.doinit()
 	y.doinit()
-	r = int(C.mpq_cmp(&z.i[0], &y.i[0]))
+	r = int(C.mpq_cmp((C.mpq_ptr)(unsafe.Pointer(&z.i)), (C.mpq_ptr)(unsafe.Pointer(&y.i))))
 	if r < 0 {
 		r = -1
 	} else if r > 0 {
@@ -400,7 +400,7 @@ func (z *Rat) Add(x, y *Rat) *Rat {
 	x.doinit()
 	y.doinit()
 	z.doinit()
-	C.mpq_add(&z.i[0], &x.i[0], &y.i[0])
+	C.mpq_add((C.mpq_ptr)(unsafe.Pointer(&z.i)), (C.mpq_ptr)(unsafe.Pointer(&x.i)), (C.mpq_ptr)(unsafe.Pointer(&y.i)))
 	return z
 }
 
@@ -409,7 +409,7 @@ func (z *Rat) Sub(x, y *Rat) *Rat {
 	x.doinit()
 	y.doinit()
 	z.doinit()
-	C.mpq_sub(&z.i[0], &x.i[0], &y.i[0])
+	C.mpq_sub((C.mpq_ptr)(unsafe.Pointer(&z.i)), (C.mpq_ptr)(unsafe.Pointer(&x.i)), (C.mpq_ptr)(unsafe.Pointer(&y.i)))
 	return z
 }
 
@@ -418,7 +418,7 @@ func (z *Rat) Mul(x, y *Rat) *Rat {
 	x.doinit()
 	y.doinit()
 	z.doinit()
-	C.mpq_mul(&z.i[0], &x.i[0], &y.i[0])
+	C.mpq_mul((C.mpq_ptr)(unsafe.Pointer(&z.i)), (C.mpq_ptr)(unsafe.Pointer(&x.i)), (C.mpq_ptr)(unsafe.Pointer(&y.i)))
 	return z
 }
 
@@ -431,7 +431,7 @@ func (z *Rat) Quo(x, y *Rat) *Rat {
 	if y.Sign() == 0 {
 		panic("division by zero")
 	}
-	C.mpq_div(&z.i[0], &x.i[0], &y.i[0])
+	C.mpq_div((C.mpq_ptr)(unsafe.Pointer(&z.i)), (C.mpq_ptr)(unsafe.Pointer(&x.i)), (C.mpq_ptr)(unsafe.Pointer(&y.i)))
 	return z
 }
 
@@ -484,7 +484,7 @@ func (z *Rat) SetString(s string) (*Rat, bool) {
 			return nil, false
 		}
 		z.SetFrac(a, b)
-		C.mpq_canonicalize(&z.i[0])
+		C.mpq_canonicalize((C.mpq_ptr)(unsafe.Pointer(&z.i)))
 		return z, true
 	}
 
@@ -520,7 +520,8 @@ func (z *Rat) SetString(s string) (*Rat, bool) {
 		b.SetInt64(1)
 	}
 	z.SetFrac(a, b)
-	C.mpq_canonicalize(&z.i[0])
+
+	C.mpq_canonicalize((C.mpq_ptr)(unsafe.Pointer(&z.i)))
 
 	return z, true
 }
@@ -531,7 +532,7 @@ func (z *Rat) string(base int) string {
 		return "<nil>"
 	}
 	z.doinit()
-	p := C.mpq_get_str(nil, C.int(base), &z.i[0])
+	p := C.mpq_get_str(nil, C.int(base), (C.mpq_ptr)(unsafe.Pointer(&z.i)))
 	s := C.GoString(p)
 	C.free(unsafe.Pointer(p))
 	return s
