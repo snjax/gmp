@@ -33,7 +33,7 @@ Install
 
 Use go to install the library
 
-    go get github.com/ncw/gmp
+    go get github.com/snjax/gmp
 
 Usage
 -----
@@ -48,19 +48,19 @@ To use as in a drop in replacement for math/big, replace
 
 With
 
-    import big "github.com/ncw/gmp"
+    import big "github.com/snjax/gmp"
 
 Features that aren't part of math/big are clearly marked and if you
 are using those, then I suggest you import as
 
-    import "github.com/ncw/gmp"
+    import "github.com/snjax/gmp"
     
 Testing
 -------
 
 To run the tests use
 
-    go test github.com/ncw/gmp
+    go test github.com/snjax/gmp
 
 The tests have been copied from the tests for the math/big library in
 the Go source and modified as little as possible so it should be 100%
