@@ -68,7 +68,7 @@ type Int struct {
 	init bool
 }
 
-func NextPrime(z *Int) *Int {
+func (z *Int) NextPrime() *Int {
 	res := new(Int)
 	res.doinit()
 	C.mpz_nextprime((C.mpz_ptr)(unsafe.Pointer(&res.i)), (C.mpz_ptr)(unsafe.Pointer(&z.i)))
